@@ -1,0 +1,9 @@
+# ProResume Studio Robots.txt
+User-agent: *
+Allow: /
+
+# Host
+Host: https://proresumestudio.vercel.app
+
+# Sitemaps
+Sitemap: https://proresumestudio.vercel.app/sitemap.xml

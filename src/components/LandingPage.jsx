@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   Sparkles,
   ArrowRight,
@@ -10,7 +10,9 @@ import {
   Zap,
   Layout,
   Briefcase,
-  ChevronRight
+  ChevronRight,
+  ChevronDown,
+  HelpCircle
 } from "lucide-react";
 
 export default function LandingPage({ onStartBuilding }) {
@@ -100,6 +102,27 @@ export default function LandingPage({ onStartBuilding }) {
     }
   ];
 
+  const faqs = [
+    {
+      q: "Is ProResume Studio completely free to use?",
+      a: "Yes, ProResume Studio is 100% free forever. You can choose any template, customize colors and fonts, edit all sections, and download high-resolution vector PDF resumes without hidden fees, paywalls, or subscriptions."
+    },
+    {
+      q: "Are the resume templates ATS-friendly?",
+      a: "Yes. All templates (Modern, Classic, Minimalist, and Executive) are crafted according to Applicant Tracking System (ATS) guidelines, featuring semantic section headings, standard fonts, and parseable content hierarchies."
+    },
+    {
+      q: "Can I download my resume directly as a PDF?",
+      a: "Yes. Clicking the 'Download PDF' button generates a pixel-perfect, vector-crisp A4 PDF document that matches the on-screen live preview exactly."
+    },
+    {
+      q: "How does ProResume Studio protect my data?",
+      a: "Your career information stays in your browser's private local storage. We do not store or sell your personal data. You can also export portable .json backups anytime to preserve your resume offline."
+    }
+  ];
+
+  const [openFaq, setOpenFaq] = useState(0);
+
   return (
     <div className="relative min-h-screen bg-zinc-950 text-zinc-100 flex flex-col font-sans overflow-x-hidden selection:bg-amber-400 selection:text-zinc-950">
       {/* Ambient Luxury Lighting & Glow Effects */}
@@ -133,6 +156,9 @@ export default function LandingPage({ onStartBuilding }) {
             </a>
             <a href="#how-it-works" className="hover:text-amber-300 transition-colors">
               Workflow
+            </a>
+            <a href="#faq" className="hover:text-amber-300 transition-colors">
+              FAQ
             </a>
           </nav>
 
@@ -384,6 +410,56 @@ export default function LandingPage({ onStartBuilding }) {
         </div>
       </section>
 
+      {/* FAQ Section (Optimized for SEO & Google Rich Snippets) */}
+      <section id="faq" className="py-20 bg-zinc-950/40 backdrop-blur-xl border-t border-white/[0.08]">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center max-w-xl mx-auto mb-12">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.04] border border-white/[0.08] text-amber-400 text-xs font-semibold mb-3">
+              <HelpCircle className="w-3.5 h-3.5" />
+              <span>Frequently Asked Questions</span>
+            </div>
+            <h2 className="text-3xl font-black text-white tracking-tight">
+              Got Questions? We Have Answers.
+            </h2>
+            <p className="mt-2 text-xs sm:text-sm text-zinc-400">
+              Everything you need to know about creating ATS-friendly resumes and exporting vector PDFs.
+            </p>
+          </div>
+
+          <div className="space-y-4">
+            {faqs.map((faq, index) => {
+              const isOpen = openFaq === index;
+              return (
+                <div
+                  key={index}
+                  className="rounded-2xl border border-white/[0.08] bg-zinc-900/40 backdrop-blur-md overflow-hidden transition-all duration-200"
+                >
+                  <button
+                    type="button"
+                    onClick={() => setOpenFaq(isOpen ? null : index)}
+                    className="w-full px-6 py-5 flex items-center justify-between text-left cursor-pointer hover:bg-white/[0.02] transition-colors"
+                    aria-expanded={isOpen}
+                  >
+                    <h3 className="text-sm sm:text-base font-bold text-zinc-100 pr-4">
+                      {faq.q}
+                    </h3>
+                    <div className={`w-7 h-7 rounded-full bg-white/[0.04] border border-white/[0.08] flex items-center justify-center text-zinc-400 shrink-0 transition-transform duration-200 ${isOpen ? "rotate-180 text-amber-400" : ""}`}>
+                      <ChevronDown className="w-4 h-4" />
+                    </div>
+                  </button>
+
+                  {isOpen && (
+                    <div className="px-6 pb-5 pt-1 text-xs sm:text-sm text-zinc-400 leading-relaxed border-t border-white/[0.04]">
+                      <p>{faq.a}</p>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
       {/* Bottom CTA Banner with Glassmorphism */}
       <section className="py-20 border-t border-white/[0.08]">
         <div className="max-w-4xl mx-auto px-4">
@@ -419,13 +495,18 @@ export default function LandingPage({ onStartBuilding }) {
             <span className="font-bold text-zinc-300">ProResume Studio</span>
           </div>
           <p>© {new Date().getFullYear()} ProResume Studio. Built with ReactJS & Tailwind CSS.</p>
-          <button
-            type="button"
-            onClick={() => onStartBuilding()}
-            className="text-amber-400 hover:text-amber-300 font-semibold cursor-pointer"
-          >
-            Launch Builder →
-          </button>
+          <div className="flex items-center gap-5">
+            <a href="#faq" className="hover:text-amber-400 transition-colors">
+              FAQ
+            </a>
+            <button
+              type="button"
+              onClick={() => onStartBuilding()}
+              className="text-amber-400 hover:text-amber-300 font-semibold cursor-pointer"
+            >
+              Launch Builder →
+            </button>
+          </div>
         </div>
       </footer>
     </div>
