@@ -12,8 +12,14 @@ import {
   Briefcase,
   ChevronRight,
   ChevronDown,
-  HelpCircle
+  HelpCircle,
+  LogIn,
+  LogOut,
+  CreditCard
 } from "lucide-react";
+import { useAuth } from "../context/AuthContext";
+import AuthModal from "./auth/AuthModal";
+import PaymentModal from "./payment/PaymentModal";
 
 export default function LandingPage({ onStartBuilding }) {
   const templates = [
@@ -102,22 +108,29 @@ export default function LandingPage({ onStartBuilding }) {
     }
   ];
 
+  const { user, isPaid, logout, setAuthModalOpen, setPaymentModalOpen } = useAuth();
+  const [showUserDropdown, setShowUserDropdown] = useState(false);
+
   const faqs = [
     {
-      q: "Is ProResume Studio completely free to use?",
-      a: "Yes, ProResume Studio is 100% free forever. You can choose any template, customize colors and fonts, edit all sections, and download high-resolution vector PDF resumes without hidden fees, paywalls, or subscriptions."
+      q: "How much does it cost to build and download a resume?",
+      a: "ProResume Studio allows you to create, edit, style, and preview resumes 100% free with no time limits or subscriptions. To download the print-ready, high-resolution vector A4 PDF document, we charge a nominal, one-time payment of ₹99 via Razorpay, granting you lifetime re-download access."
+    },
+    {
+      q: "Why do I need to create an account before downloading?",
+      a: "Creating a quick account with your name, email, and mobile number securely registers your ₹99 lifetime download pass with your profile in our MongoDB database, enabling you to sign in from anywhere and re-download your resume without paying again."
     },
     {
       q: "Are the resume templates ATS-friendly?",
       a: "Yes. All templates (Modern, Classic, Minimalist, and Executive) are crafted according to Applicant Tracking System (ATS) guidelines, featuring semantic section headings, standard fonts, and parseable content hierarchies."
     },
     {
-      q: "Can I download my resume directly as a PDF?",
-      a: "Yes. Clicking the 'Download PDF' button generates a pixel-perfect, vector-crisp A4 PDF document that matches the on-screen live preview exactly."
+      q: "Which payment methods are accepted by Razorpay?",
+      a: "Our Razorpay gateway supports all major payment modes including UPI (Google Pay, PhonePe, Paytm, BHIM), Credit/Debit Cards (Visa, MasterCard, RuPay), NetBanking, and Digital Wallets."
     },
     {
       q: "How does ProResume Studio protect my data?",
-      a: "Your career information stays in your browser's private local storage. We do not store or sell your personal data. You can also export portable .json backups anytime to preserve your resume offline."
+      a: "Your account credentials and payment records are protected with 256-bit encryption and strict security controls. Your career information is private, and we never sell your personal data."
     }
   ];
 
@@ -142,7 +155,7 @@ export default function LandingPage({ onStartBuilding }) {
                 ProResume Studio
               </span>
               <span className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-white/[0.05] text-amber-300 border border-white/10 backdrop-blur-sm">
-                Fast & Free
+                Fast & ATS-Optimized
               </span>
             </div>
           </div>
@@ -158,18 +171,87 @@ export default function LandingPage({ onStartBuilding }) {
               Workflow
             </a>
             <a href="#faq" className="hover:text-amber-300 transition-colors">
-              FAQ
+              FAQ & Pricing
             </a>
           </nav>
 
-          <button
-            type="button"
-            onClick={() => onStartBuilding()}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-amber-400 via-amber-300 to-yellow-500 hover:from-amber-300 hover:to-yellow-400 text-zinc-950 shadow-md shadow-amber-500/20 transition-all cursor-pointer"
-          >
-            <span>Launch Builder</span>
-            <ArrowRight className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-3">
+            {/* User Account Pill or Sign In Button */}
+            {user ? (
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setShowUserDropdown(!showUserDropdown)}
+                  className="text-xs px-2.5 py-1.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] backdrop-blur-sm text-zinc-200 flex items-center gap-2 transition-all border border-white/[0.08] cursor-pointer"
+                >
+                  <div className="w-5 h-5 rounded-full bg-gradient-to-tr from-amber-500 to-yellow-300 flex items-center justify-center text-[10px] font-bold text-zinc-950">
+                    {user.name ? user.name.charAt(0).toUpperCase() : "U"}
+                  </div>
+                  <span className="hidden sm:inline font-medium max-w-[90px] truncate">{user.name}</span>
+                  {isPaid ? (
+                    <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-amber-500/10 text-amber-300 border border-amber-500/20">
+                      ₹99 Pass
+                    </span>
+                  ) : (
+                    <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-white/[0.05] text-zinc-400 border border-white/10">
+                      Free
+                    </span>
+                  )}
+                </button>
+
+                {showUserDropdown && (
+                  <div className="absolute right-0 mt-2 w-52 rounded-2xl bg-zinc-900/95 backdrop-blur-xl border border-white/[0.1] shadow-2xl p-2 z-50 text-xs text-zinc-200">
+                    <div className="px-3 py-2 border-b border-white/[0.06] mb-1">
+                      <p className="font-bold text-white truncate">{user.name}</p>
+                      <p className="text-[10px] text-zinc-400 truncate">{user.email}</p>
+                    </div>
+                    {!isPaid && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowUserDropdown(false);
+                          setPaymentModalOpen(true);
+                        }}
+                        className="w-full text-left px-3 py-2 rounded-lg hover:bg-amber-500/10 text-amber-300 font-semibold flex items-center gap-2 cursor-pointer"
+                      >
+                        <CreditCard className="w-3.5 h-3.5" />
+                        <span>Unlock Downloads (₹99)</span>
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowUserDropdown(false);
+                        logout();
+                      }}
+                      className="w-full text-left px-3 py-2 rounded-lg hover:bg-rose-950/40 text-rose-300 flex items-center gap-2 cursor-pointer"
+                    >
+                      <LogOut className="w-3.5 h-3.5" />
+                      <span>Sign Out</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setAuthModalOpen(true)}
+                className="text-xs px-3 py-1.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] backdrop-blur-sm text-zinc-200 flex items-center gap-1.5 transition-all border border-white/[0.08] cursor-pointer"
+              >
+                <LogIn className="w-3.5 h-3.5 text-amber-400" />
+                <span className="hidden sm:inline font-semibold">Sign In</span>
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={() => onStartBuilding()}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-amber-400 via-amber-300 to-yellow-500 hover:from-amber-300 hover:to-yellow-400 text-zinc-950 shadow-md shadow-amber-500/20 transition-all cursor-pointer"
+            >
+              <span>Launch Builder</span>
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       </header>
 
@@ -509,6 +591,10 @@ export default function LandingPage({ onStartBuilding }) {
           </div>
         </div>
       </footer>
+
+      {/* Auth & Payment Modals */}
+      <AuthModal />
+      <PaymentModal />
     </div>
   );
 }

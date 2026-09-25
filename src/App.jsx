@@ -19,7 +19,11 @@ import {
   Maximize2,
   CheckCircle2,
   FileDown,
-  ArrowLeft
+  ArrowLeft,
+  LogIn,
+  LogOut,
+  CreditCard,
+  Sparkles
 } from "lucide-react";
 
 import { initialResumeData, presets, colorPalettes, fontFamilies } from "./data/initialData";
@@ -38,6 +42,10 @@ import ModernTemplate from "./components/templates/ModernTemplate";
 import ClassicTemplate from "./components/templates/ClassicTemplate";
 import MinimalistTemplate from "./components/templates/MinimalistTemplate";
 import ExecutiveTemplate from "./components/templates/ExecutiveTemplate";
+
+import { useAuth } from "./context/AuthContext";
+import AuthModal from "./components/auth/AuthModal";
+import PaymentModal from "./components/payment/PaymentModal";
 
 const TABS = [
   { id: "personal", label: "Personal", icon: User },
@@ -96,6 +104,17 @@ export default function App() {
   const [saveIndicator, setSaveIndicator] = useState(false);
   const [storageWarning, setStorageWarning] = useState("");
   const [showPresetMenu, setShowPresetMenu] = useState(false);
+  const [showUserMenu, setShowUserMenu] = useState(false);
+
+  const {
+    user,
+    isPaid,
+    logout,
+    setAuthModalOpen,
+    setPaymentModalOpen,
+    setAuthNotice,
+    recordDownload,
+  } = useAuth();
 
   const fileInputRef = useRef(null);
 
@@ -171,6 +190,24 @@ export default function App() {
     window.addEventListener("afterprint", restoreTitle);
     window.print();
     setTimeout(restoreTitle, 2500);
+  };
+
+  // Gate PDF Download behind Authentication & ₹99 One-Time Payment Pass
+  const handleInitiateDownload = () => {
+    if (!user) {
+      setAuthNotice("Please create an account or sign in to download your resume.");
+      setAuthModalOpen(true);
+      return;
+    }
+
+    if (!isPaid) {
+      setPaymentModalOpen(true);
+      return;
+    }
+
+    // Authenticated & Paid: Authorize download
+    recordDownload();
+    handlePrint();
   };
 
   const handleExportJSON = () => {
@@ -390,14 +427,109 @@ export default function App() {
             </button>
           </div>
 
-          {/* Download PDF button */}
+          {/* User Profile / Auth Button */}
+          {user ? (
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setShowUserMenu(!showUserMenu)}
+                className="text-xs px-2.5 py-1.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] backdrop-blur-sm text-zinc-200 flex items-center gap-2 transition-all border border-white/[0.08] cursor-pointer"
+              >
+                <div className="w-5 h-5 rounded-full bg-gradient-to-tr from-amber-500 to-yellow-300 flex items-center justify-center text-[10px] font-bold text-zinc-950">
+                  {user.name ? user.name.charAt(0).toUpperCase() : "U"}
+                </div>
+                <span className="hidden sm:inline font-medium max-w-[100px] truncate">{user.name}</span>
+                {isPaid ? (
+                  <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-amber-500/10 text-amber-300 border border-amber-500/20">
+                    ₹99 Pass
+                  </span>
+                ) : (
+                  <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-white/[0.05] text-zinc-400 border border-white/10">
+                    Free
+                  </span>
+                )}
+              </button>
+
+              {showUserMenu && (
+                <div className="absolute right-0 mt-2 w-56 rounded-2xl bg-zinc-900/95 backdrop-blur-xl border border-white/[0.1] shadow-2xl p-2 z-50 text-xs text-zinc-200">
+                  <div className="px-3 py-2 border-b border-white/[0.06] mb-1">
+                    <p className="font-bold text-white truncate">{user.name}</p>
+                    <p className="text-[10px] text-zinc-400 truncate">{user.email}</p>
+                    <div className="mt-1 flex items-center gap-1 text-[10px]">
+                      {isPaid ? (
+                        <span className="text-emerald-400 flex items-center gap-1 font-semibold">
+                          <CheckCircle2 className="w-3 h-3" /> Lifetime Pass Active
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowUserMenu(false);
+                            setPaymentModalOpen(true);
+                          }}
+                          className="text-amber-400 hover:text-amber-300 flex items-center gap-1 font-semibold cursor-pointer text-left"
+                        >
+                          <Sparkles className="w-3 h-3" /> Unlock ₹99 Download Pass
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {!isPaid && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowUserMenu(false);
+                        setPaymentModalOpen(true);
+                      }}
+                      className="w-full text-left px-3 py-2 rounded-lg hover:bg-amber-500/10 text-amber-300 font-semibold flex items-center gap-2 cursor-pointer"
+                    >
+                      <CreditCard className="w-3.5 h-3.5" />
+                      <span>Unlock Downloads (₹99)</span>
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowUserMenu(false);
+                      logout();
+                    }}
+                    className="w-full text-left px-3 py-2 rounded-lg hover:bg-rose-950/40 text-rose-300 flex items-center gap-2 cursor-pointer"
+                  >
+                    <LogOut className="w-3.5 h-3.5" />
+                    <span>Sign Out</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => {
+                setAuthNotice("");
+                setAuthModalOpen(true);
+              }}
+              className="text-xs px-2.5 sm:px-3 py-1.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] backdrop-blur-sm text-zinc-200 flex items-center gap-1.5 transition-all border border-white/[0.08] cursor-pointer"
+            >
+              <LogIn className="w-3.5 h-3.5 text-amber-400" />
+              <span className="hidden sm:inline font-semibold">Sign In</span>
+            </button>
+          )}
+
+          {/* Download PDF button (Gated behind Auth + ₹99 Razorpay Payment) */}
           <button
             type="button"
-            onClick={handlePrint}
+            onClick={handleInitiateDownload}
             className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-bold bg-gradient-to-r from-amber-400 via-amber-300 to-yellow-500 hover:from-amber-300 hover:to-yellow-400 active:from-amber-500 active:to-yellow-600 text-zinc-950 shadow-md shadow-amber-500/25 transition-all cursor-pointer"
           >
             <Download className="w-4 h-4" />
             <span>Download PDF</span>
+            {!isPaid && (
+              <span className="ml-0.5 px-1.5 py-0.2 rounded bg-zinc-950/20 text-[10px] font-extrabold tracking-tight">
+                ₹99
+              </span>
+            )}
           </button>
         </div>
       </header>
@@ -579,6 +711,20 @@ export default function App() {
           </div>
         </div>
       </div>
+
+      {/* Authentication Modal */}
+      <AuthModal
+        onSuccess={() => {
+          if (!isPaid) {
+            setPaymentModalOpen(true);
+          } else {
+            handlePrint();
+          }
+        }}
+      />
+
+      {/* Razorpay ₹99 Payment Modal */}
+      <PaymentModal onSuccess={handlePrint} />
     </div>
   );
 }
