@@ -142,6 +142,17 @@ export default function App() {
     }
   }, [resumeData, template, theme, fontFamily]);
 
+  // Disable direct screen printing via Ctrl+P / Cmd+P to enforce using Download PDF button
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if ((e.ctrlKey || e.metaKey) && (e.key === "p" || e.key === "P")) {
+        e.preventDefault();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
   // Handle print with afterprint listener and timeout fallback to prevent title race conditions (BUG-012)
   const handlePrint = () => {
     const originalTitle = document.title;
@@ -259,7 +270,10 @@ export default function App() {
 
   // Otherwise render interactive Resume Builder workspace
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col font-sans">
+    <div
+      className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col font-sans"
+      onContextMenu={(e) => e.preventDefault()}
+    >
       {/* Top Navigation Bar with Glassmorphism */}
       <header className="no-print h-16 border-b border-white/[0.08] bg-zinc-950/75 backdrop-blur-xl sticky top-0 z-30 px-4 sm:px-6 flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -542,15 +556,23 @@ export default function App() {
             </div>
           </div>
 
-          {/* Interactive Document Viewport */}
-          <div className="flex-1 overflow-y-auto p-4 sm:p-8 flex justify-center items-start print-area bg-zinc-950">
+          {/* Interactive Document Viewport with Screen Print & Click Protection */}
+          <div
+            className="flex-1 overflow-y-auto p-4 sm:p-8 flex justify-center items-start print-area bg-zinc-950 select-none cursor-default"
+            onContextMenu={(e) => e.preventDefault()}
+            onClick={(e) => e.preventDefault()}
+            onMouseDown={(e) => {
+              // Disable left-click (button 0) and right-click (button 2) direct screen interactions
+              e.preventDefault();
+            }}
+          >
             <div
               style={{
                 transform: `scale(${zoom / 100})`,
                 transformOrigin: "top center",
                 transition: "transform 0.15s ease-out"
               }}
-              className="origin-top"
+              className="origin-top pointer-events-none select-none"
             >
               {renderActiveTemplate()}
             </div>

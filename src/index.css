@@ -160,6 +160,7 @@
     max-width: 210mm !important;
     margin: 0 auto !important;
     padding: 0 !important;
+    pointer-events: auto !important;
   }
 
   .a4-page {
