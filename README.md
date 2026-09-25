@@ -60,7 +60,6 @@ Build optimized production assets:
 npm run build
 ```
 
-### 3. Preview Production Build
-```bash
-npm run preview
-```
+### 3. Live Deployment
+Deployed and hosted on Vercel:
+👉 **[https://proresumestudio.vercel.app](https://proresumestudio.vercel.app)**
