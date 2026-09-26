@@ -2,6 +2,10 @@ import React, { createContext, useContext, useState, useEffect } from "react";
 
 const AuthContext = createContext(null);
 
+// In production, optionally point to an external backend URL via VITE_API_URL.
+// Defaults to empty string, which routes to relative /api (handled by Vite proxy locally or Vercel rewrites in production).
+const API_BASE = (import.meta.env.VITE_API_URL || "").replace(/\/$/, "");
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(() => localStorage.getItem("proresume_token") || null);
@@ -20,7 +24,7 @@ export function AuthProvider({ children }) {
       }
 
       try {
-        const res = await fetch("/api/auth/me", {
+        const res = await fetch(`${API_BASE}/api/auth/me`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -59,7 +63,7 @@ export function AuthProvider({ children }) {
 
   // Login with Email & Password
   const login = async (email, password) => {
-    const res = await fetch("/api/auth/login", {
+    const res = await fetch(`${API_BASE}/api/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password }),
@@ -80,7 +84,7 @@ export function AuthProvider({ children }) {
 
   // Register with Name, Email, Phone, Password
   const register = async (name, email, phone, password) => {
-    const res = await fetch("/api/auth/register", {
+    const res = await fetch(`${API_BASE}/api/auth/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name, email, phone, password }),
@@ -101,7 +105,7 @@ export function AuthProvider({ children }) {
 
   // Google OAuth Simulated / Production Sign-In
   const loginWithGoogle = async (googleUser) => {
-    const res = await fetch("/api/auth/google", {
+    const res = await fetch(`${API_BASE}/api/auth/google`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(googleUser),
@@ -132,7 +136,7 @@ export function AuthProvider({ children }) {
   const refreshUser = async () => {
     if (!token) return null;
     try {
-      const res = await fetch("/api/auth/me", {
+      const res = await fetch(`${API_BASE}/api/auth/me`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
@@ -155,7 +159,7 @@ export function AuthProvider({ children }) {
       throw new Error("You must be logged in to initiate payment.");
     }
 
-    const res = await fetch("/api/payment/create-order", {
+    const res = await fetch(`${API_BASE}/api/payment/create-order`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -177,7 +181,7 @@ export function AuthProvider({ children }) {
       throw new Error("Authentication token required.");
     }
 
-    const res = await fetch("/api/payment/verify-payment", {
+    const res = await fetch(`${API_BASE}/api/payment/verify-payment`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -205,7 +209,7 @@ export function AuthProvider({ children }) {
       throw new Error("Authentication token required.");
     }
 
-    const res = await fetch("/api/payment/sandbox-complete", {
+    const res = await fetch(`${API_BASE}/api/payment/sandbox-complete`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -231,7 +235,7 @@ export function AuthProvider({ children }) {
   const recordDownload = async () => {
     if (!token) return;
     try {
-      await fetch("/api/payment/record-download", {
+      await fetch(`${API_BASE}/api/payment/record-download`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
