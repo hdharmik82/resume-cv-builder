@@ -37,4 +37,11 @@ lerna-debug.log*
 # Vercel
 .vercel
 
-.vercel
+# Local Credential Vaults & Private Secrets (Never commit to Git)
+*credentials*
+*Credentials*
+*vault*
+*Vault*
+*.secret
+secrets/
+credentials/
