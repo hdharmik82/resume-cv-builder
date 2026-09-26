@@ -453,20 +453,18 @@ export default function App() {
             </button>
           </div>
 
-          {/* Admin Portal Quick Link Button - Always visible for quick access */}
-          <button
-            type="button"
-            onClick={navigateToAdmin}
-            className={`text-xs px-2.5 py-1.5 rounded-xl flex items-center gap-1.5 transition-all cursor-pointer font-bold ${
-              user?.role === "admin"
-                ? "bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 shadow-sm"
-                : "bg-white/[0.04] hover:bg-white/[0.08] text-zinc-400 hover:text-zinc-200 border border-white/[0.08]"
-            }`}
-            title="Open Admin Control Center"
-          >
-            <Shield className={`w-3.5 h-3.5 ${user?.role === "admin" ? "text-amber-400" : "text-zinc-400"}`} />
-            <span className="hidden sm:inline">{user?.role === "admin" ? "Admin Panel" : "Admin"}</span>
-          </button>
+          {/* Admin Panel Quick Link Button - Visible only for authenticated Admins */}
+          {user?.role === "admin" && (
+            <button
+              type="button"
+              onClick={navigateToAdmin}
+              className="text-xs px-2.5 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center gap-1.5 transition-all cursor-pointer font-bold shadow-sm"
+              title="Open Admin Control Center"
+            >
+              <Shield className="w-3.5 h-3.5 text-amber-400" />
+              <span className="hidden sm:inline">Admin Panel</span>
+            </button>
+          )}
 
           {/* User Profile / Auth Button */}
           {user ? (

@@ -9,55 +9,7 @@ import { seedInitialDataIfNeeded } from "../utils/seedData.js";
 
 const router = express.Router();
 
-const ADMIN_SETUP_SECRET =
-  process.env.ADMIN_SETUP_SECRET || "admin123";
-
-/**
- * @route   POST /api/admin/claim-admin
- * @desc    Allows an authenticated user to claim admin role using the setup key or if no admin exists
- * @access  Private (Authenticated)
- */
-router.post("/claim-admin", authenticateToken, async (req, res) => {
-  try {
-    const { secretKey } = req.body;
-    const adminCount = await User.countDocuments({ role: "admin" });
-
-    // Allow if no admin exists yet OR valid setup secret provided
-    const isFirstAdmin = adminCount === 0;
-    const isValidSecret = secretKey && secretKey.trim() === ADMIN_SETUP_SECRET;
-
-    if (!isFirstAdmin && !isValidSecret) {
-      return res.status(403).json({
-        success: false,
-        message: "Invalid admin setup key. Admin claim rejected.",
-      });
-    }
-
-    const user = await User.findById(req.user._id);
-    if (!user) {
-      return res.status(404).json({ success: false, message: "User not found." });
-    }
-
-    user.role = "admin";
-    await user.save();
-
-    console.log(`[Admin Promotion] User ${user.email} promoted to admin.`);
-
-    return res.status(200).json({
-      success: true,
-      message: `Account ${user.email} successfully upgraded to Administrator!`,
-      user: user.toJSON(),
-    });
-  } catch (error) {
-    console.error("[Claim Admin Error]:", error);
-    return res.status(500).json({
-      success: false,
-      message: error.message || "Failed to process admin claim.",
-    });
-  }
-});
-
-// All subsequent routes require Authentication AND Admin Role
+// All routes require Authentication AND Admin Role (only Super Admin can manage users)
 router.use(authenticateToken);
 router.use(requireAdmin);
 

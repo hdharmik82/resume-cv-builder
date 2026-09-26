@@ -64,7 +64,7 @@ export default function AdminPanel({ onBackToBuilder, onBackToLanding }) {
       const loggedUser = await login(adminEmail.trim(), adminPassword);
       if (loggedUser.role !== "admin") {
         setAdminLoginError(
-          "Signed in, but this account does not have administrator privileges. Please use an admin account or enter the setup key below."
+          "Signed in, but this account does not have administrator privileges. Only accounts authorized by a Super Administrator can access this area."
         );
       } else {
         showToast("Signed in as Administrator!", "success");
@@ -74,12 +74,6 @@ export default function AdminPanel({ onBackToBuilder, onBackToLanding }) {
     } finally {
       setAdminLoginLoading(false);
     }
-  };
-
-  const handleFillDemoAdmin = () => {
-    setAdminEmail("admin@proresume.com");
-    setAdminPassword("adminpassword123");
-    setAdminLoginError("");
   };
 
   // Overview Data
@@ -110,7 +104,6 @@ export default function AdminPanel({ onBackToBuilder, onBackToLanding }) {
   const [passwordUser, setPasswordUser] = useState(null);
   const [deleteUserTarget, setDeleteUserTarget] = useState(null);
   const [showManualPaymentModal, setShowManualPaymentModal] = useState(false);
-  const [claimAdminSecret, setClaimAdminSecret] = useState("");
 
   // Feedback notifications (toast)
   const [toast, setToast] = useState(null);
@@ -316,31 +309,6 @@ export default function AdminPanel({ onBackToBuilder, onBackToLanding }) {
     showToast("Downloading payments CSV...", "info");
   };
 
-  // Claim Admin
-  const handleClaimAdmin = async (e) => {
-    e.preventDefault();
-    try {
-      const res = await fetch(`${API_BASE}/api/admin/claim-admin`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ secretKey: claimAdminSecret }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        showToast(data.message, "success");
-        await refreshUser();
-        fetchOverview();
-      } else {
-        showToast(data.message || "Admin claim rejected.", "error");
-      }
-    } catch (err) {
-      showToast("Error claiming admin role.", "error");
-    }
-  };
-
   // Re-seed mock data
   const handleSeedDemo = async () => {
     try {
@@ -379,16 +347,6 @@ export default function AdminPanel({ onBackToBuilder, onBackToLanding }) {
             <p className="mt-1.5 text-xs text-zinc-400 leading-relaxed">
               Sign in with your administrator credentials to access platform controls and user management.
             </p>
-
-            {/* Quick Fill Credentials Shortcut */}
-            <button
-              type="button"
-              onClick={handleFillDemoAdmin}
-              className="mt-4 w-full py-2.5 px-3 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-semibold flex items-center justify-center gap-2 cursor-pointer transition-all"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-              <span>Fill Default Admin Credentials</span>
-            </button>
 
             {/* Login Error Notification */}
             {adminLoginError && (
@@ -473,7 +431,7 @@ export default function AdminPanel({ onBackToBuilder, onBackToLanding }) {
             </div>
           </div>
         ) : (
-          /* Case 2: Logged in, but lacks Admin Role -> Elevation or Switch Account */
+          /* Case 2: Logged in, but lacks Admin Role -> Access Denied & Super Admin Notice */
           <div className="w-full max-w-md bg-zinc-900/70 backdrop-blur-2xl border border-white/[0.1] rounded-3xl p-6 sm:p-8 text-center shadow-2xl relative">
             <div className="w-14 h-14 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-400 mx-auto flex items-center justify-center mb-4 shadow-inner">
               <Lock className="w-7 h-7" />
@@ -481,33 +439,18 @@ export default function AdminPanel({ onBackToBuilder, onBackToLanding }) {
 
             <h2 className="text-2xl font-black text-white tracking-tight">Admin Privileges Required</h2>
             <p className="mt-1.5 text-xs text-zinc-400 leading-relaxed">
-              Signed in as <strong className="text-zinc-200 font-mono">{user.email}</strong> (User Role). This section requires administrator authorization.
+              Signed in as <strong className="text-zinc-200 font-mono">{user.email}</strong> (User Role).
             </p>
 
-            {/* Elevation Form with Setup Key */}
-            <div className="mt-5 p-4 rounded-2xl bg-zinc-950/70 border border-white/[0.08] text-left">
-              <div className="flex items-center gap-2 mb-1.5">
-                <Key className="w-4 h-4 text-amber-400" />
-                <span className="text-xs font-bold text-zinc-200">Elevate This Account</span>
+            {/* Super Admin Authorization Policy Notice */}
+            <div className="mt-5 p-4 rounded-2xl bg-zinc-950/70 border border-white/[0.08] text-center space-y-2">
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-300 text-[10px] font-bold border border-amber-500/20">
+                <ShieldCheck className="w-3.5 h-3.5" />
+                <span>Super Administrator Authorization Required</span>
               </div>
-              <p className="text-[11px] text-zinc-400 mb-3">
-                Enter your platform setup secret key (<code className="text-amber-300 font-bold">admin123</code>) to upgrade this account to Administrator:
+              <p className="text-xs text-zinc-400 leading-relaxed">
+                Administrator permissions can only be granted by an existing Super Administrator. Self-elevation is restricted.
               </p>
-              <form onSubmit={handleClaimAdmin} className="space-y-2.5">
-                <input
-                  type="password"
-                  placeholder="Setup Key (default: admin123)"
-                  value={claimAdminSecret}
-                  onChange={(e) => setClaimAdminSecret(e.target.value)}
-                  className="w-full px-3 py-2 bg-zinc-900 border border-white/10 rounded-xl text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-amber-400"
-                />
-                <button
-                  type="submit"
-                  className="w-full py-2 px-3 rounded-xl text-xs font-bold bg-gradient-to-r from-amber-400 to-yellow-500 text-zinc-950 hover:from-amber-300 hover:to-yellow-400 shadow-md cursor-pointer transition-all"
-                >
-                  Upgrade to Administrator
-                </button>
-              </form>
             </div>
 
             {/* Switch Account or Return */}
@@ -1331,8 +1274,8 @@ export default function AdminPanel({ onBackToBuilder, onBackToLanding }) {
                   <span className="font-mono text-amber-300 font-bold">admin@proresume.com</span>
                 </div>
                 <div className="flex items-center justify-between text-xs">
-                  <span className="text-zinc-400">Admin Setup Secret Key:</span>
-                  <span className="font-mono text-zinc-300">admin123 (or custom via ADMIN_SETUP_SECRET env)</span>
+                  <span className="text-zinc-400">Admin Authorization Policy:</span>
+                  <span className="font-mono text-zinc-300">Superadmin Role Delegation Only</span>
                 </div>
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-zinc-400">Razorpay Fee Model:</span>
