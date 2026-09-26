@@ -3,6 +3,9 @@ import { Payment } from "../models/Payment.js";
 
 export async function seedInitialDataIfNeeded() {
   try {
+    const defaultAdminEmail = (process.env.INITIAL_ADMIN_EMAIL || "admin@proresume.com").trim().toLowerCase();
+    const defaultAdminPassword = process.env.INITIAL_ADMIN_PASSWORD || "adminpassword123";
+
     const userCount = await User.countDocuments();
     if (userCount > 0) {
       // Check if at least one admin exists
@@ -11,16 +14,16 @@ export async function seedInitialDataIfNeeded() {
         console.log("[Seed] No admin found, ensuring default admin exists...");
         await User.create({
           name: "System Administrator",
-          email: "admin@proresume.com",
+          email: defaultAdminEmail,
           phone: "+91 9876543210",
-          password: "adminpassword123", // Mongoose pre-save hook handles hashing
+          password: defaultAdminPassword, // Mongoose pre-save hook handles hashing
           authProvider: "local",
           role: "admin",
           isPaid: true,
           paidAt: new Date(),
           downloadCount: 12,
         });
-        console.log("[Seed] Default admin created: admin@proresume.com / adminpassword123");
+        console.log(`[Seed] Initial admin user initialized for ${defaultAdminEmail}.`);
       }
       return;
     }
@@ -30,15 +33,16 @@ export async function seedInitialDataIfNeeded() {
     // 1. Create Default Admin
     const admin = await User.create({
       name: "System Administrator",
-      email: "admin@proresume.com",
+      email: defaultAdminEmail,
       phone: "+91 9876543210",
-      password: "adminpassword123", // Mongoose pre-save hook will hash this once
+      password: defaultAdminPassword, // Mongoose pre-save hook will hash this once
       authProvider: "local",
       role: "admin",
       isPaid: true,
       paidAt: new Date(Date.now() - 14 * 86400000),
       downloadCount: 18,
     });
+
 
     // 2. Create Demo Paid User 1
     const user1 = await User.create({
@@ -137,11 +141,14 @@ export async function seedInitialDataIfNeeded() {
     ]);
 
     console.log("[Seed] Successfully seeded initial demo users and transactions.");
-    console.log("----------------------------------------------------------------");
-    console.log(" Admin Credentials:");
-    console.log(" Email:    admin@proresume.com");
-    console.log(" Password: adminpassword123");
-    console.log("----------------------------------------------------------------");
+    if (process.env.NODE_ENV !== "production") {
+      console.log("----------------------------------------------------------------");
+      console.log(" Initial Admin Initialized:");
+      console.log(` Email:    ${defaultAdminEmail}`);
+      console.log(" Password: (set via INITIAL_ADMIN_PASSWORD or default in dev)");
+      console.log("----------------------------------------------------------------");
+    }
+
   } catch (error) {
     console.error("[Seed Error]:", error);
   }

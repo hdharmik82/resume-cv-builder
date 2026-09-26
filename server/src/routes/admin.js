@@ -3,9 +3,12 @@ import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import { User } from "../models/User.js";
 import { Payment } from "../models/Payment.js";
+import { SupportTicket } from "../models/SupportTicket.js";
 import { authenticateToken, requireAdmin } from "../middleware/auth.js";
 import { getDbStatus } from "../config/db.js";
 import { seedInitialDataIfNeeded } from "../utils/seedData.js";
+import { sanitizeString } from "../utils/sanitize.js";
+
 
 const router = express.Router();
 
@@ -64,6 +67,18 @@ router.get("/overview", async (req, res) => {
       .sort({ createdAt: -1 })
       .limit(5);
 
+    // Support Inquiries Metrics
+    const totalTickets = await SupportTicket.countDocuments();
+    const openTickets = await SupportTicket.countDocuments({ status: "open" });
+    const inProgressTickets = await SupportTicket.countDocuments({ status: "in_progress" });
+    const resolvedTickets = await SupportTicket.countDocuments({ status: "resolved" });
+    const paymentTickets = await SupportTicket.countDocuments({ category: "payment", status: { $in: ["open", "in_progress"] } });
+
+    // Recent 5 support tickets
+    const recentTickets = await SupportTicket.find()
+      .sort({ createdAt: -1 })
+      .limit(5);
+
     // System Diagnostics
     const db = getDbStatus();
     const razorpayKeyId = process.env.RAZORPAY_KEY_ID || "";
@@ -94,17 +109,23 @@ router.get("/overview", async (req, res) => {
         capturedTransactions,
         failedTransactions,
         conversionRate,
+        totalTickets,
+        openTickets,
+        inProgressTickets,
+        resolvedTickets,
+        paymentTickets,
       },
       recentUsers,
       recentPayments,
+      recentTickets,
       system,
     });
   } catch (error) {
-    console.error("[Admin Overview Error]:", error);
+    console.error("[Admin Overview Error]:", error?.message || error);
     return res.status(500).json({
       success: false,
       message: "Failed to load dashboard metrics.",
-      error: error.message,
+      ...(process.env.NODE_ENV === "development" && { error: error.message }),
     });
   }
 });
@@ -160,11 +181,11 @@ router.get("/users", async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("[Admin Users Error]:", error);
+    console.error("[Admin Users Error]:", error?.message || error);
     return res.status(500).json({
       success: false,
       message: "Failed to fetch users.",
-      error: error.message,
+      ...(process.env.NODE_ENV === "development" && { error: error.message }),
     });
   }
 });
@@ -464,11 +485,11 @@ router.get("/payments", async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("[Admin Payments Error]:", error);
+    console.error("[Admin Payments Error]:", error?.message || error);
     return res.status(500).json({
       success: false,
       message: "Failed to fetch transactions.",
-      error: error.message,
+      ...(process.env.NODE_ENV === "development" && { error: error.message }),
     });
   }
 });
@@ -668,10 +689,193 @@ router.post("/seed-demo", async (req, res) => {
       message: "Database seed operation executed.",
     });
   } catch (error) {
+    console.error("[Admin Seed Demo Error]:", error?.message || error);
     return res.status(500).json({
       success: false,
       message: "Failed to trigger seed.",
-      error: error.message,
+      ...(process.env.NODE_ENV === "development" && { error: error.message }),
+    });
+  }
+});
+
+/**
+ * @route   GET /api/admin/support/tickets
+ * @desc    Get paginated, searchable, and filtered list of support tickets
+ * @access  Private (Admin Only)
+ */
+router.get("/support/tickets", async (req, res) => {
+  try {
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.max(1, Math.min(100, parseInt(req.query.limit) || 10));
+    const search = sanitizeString(req.query.search || "", 100);
+    const category = sanitizeString(req.query.category || "all", 50);
+    const status = sanitizeString(req.query.status || "all", 50);
+    const sortBy = ["createdAt", "priority", "status"].includes(req.query.sortBy)
+      ? req.query.sortBy
+      : "createdAt";
+    const sortOrder = req.query.sortOrder === "asc" ? 1 : -1;
+
+    const query = {};
+
+    if (search) {
+      query.$or = [
+        { ticketId: { $regex: search, $options: "i" } },
+        { email: { $regex: search, $options: "i" } },
+        { name: { $regex: search, $options: "i" } },
+        { subject: { $regex: search, $options: "i" } },
+      ];
+    }
+
+    if (category && category !== "all") {
+      query.category = category;
+    }
+
+    if (status && status !== "all") {
+      query.status = status;
+    }
+
+    const total = await SupportTicket.countDocuments(query);
+    const tickets = await SupportTicket.find(query)
+      .sort({ [sortBy]: sortOrder })
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .populate("userId", "name email phone isPaid downloadCount");
+
+    // Breakdown counts for tab badges
+    const openCount = await SupportTicket.countDocuments({ status: "open" });
+    const inProgressCount = await SupportTicket.countDocuments({ status: "in_progress" });
+    const resolvedCount = await SupportTicket.countDocuments({ status: "resolved" });
+
+    return res.status(200).json({
+      success: true,
+      tickets,
+      counts: {
+        total,
+        open: openCount,
+        inProgress: inProgressCount,
+        resolved: resolvedCount,
+      },
+      pagination: {
+        total,
+        page,
+        limit,
+        pages: Math.ceil(total / limit) || 1,
+      },
+    });
+  } catch (error) {
+    console.error("[Admin Support Tickets Error]:", error?.message || error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch support tickets.",
+      ...(process.env.NODE_ENV === "development" && { error: error.message }),
+    });
+  }
+});
+
+/**
+ * @route   GET /api/admin/support/tickets/:id
+ * @desc    Get single support ticket details
+ * @access  Private (Admin Only)
+ */
+router.get("/support/tickets/:id", async (req, res) => {
+  try {
+    const ticket = await SupportTicket.findById(req.params.id).populate(
+      "userId",
+      "name email phone isPaid downloadCount"
+    );
+    if (!ticket) {
+      return res.status(404).json({ success: false, message: "Support ticket not found." });
+    }
+
+    return res.status(200).json({
+      success: true,
+      ticket,
+    });
+  } catch (error) {
+    console.error("[Admin Get Ticket Error]:", error?.message || error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch ticket details.",
+    });
+  }
+});
+
+/**
+ * @route   PATCH /api/admin/support/tickets/:id
+ * @desc    Update support ticket status, priority, or admin resolution notes
+ * @access  Private (Admin Only)
+ */
+router.patch("/support/tickets/:id", async (req, res) => {
+  try {
+    const ticket = await SupportTicket.findById(req.params.id);
+    if (!ticket) {
+      return res.status(404).json({ success: false, message: "Support ticket not found." });
+    }
+
+    const { status, priority, adminNotes } = req.body;
+
+    if (status) {
+      const validStatuses = ["open", "in_progress", "resolved", "closed"];
+      if (!validStatuses.includes(status)) {
+        return res.status(400).json({ success: false, message: "Invalid status value." });
+      }
+      ticket.status = status;
+      if (status === "resolved") {
+        ticket.resolvedAt = new Date();
+        ticket.resolvedBy = req.user.email;
+      }
+    }
+
+    if (priority) {
+      const validPriorities = ["low", "medium", "high", "urgent"];
+      if (!validPriorities.includes(priority)) {
+        return res.status(400).json({ success: false, message: "Invalid priority value." });
+      }
+      ticket.priority = priority;
+    }
+
+    if (typeof adminNotes === "string") {
+      ticket.adminNotes = sanitizeString(adminNotes, 2000);
+    }
+
+    await ticket.save();
+
+    return res.status(200).json({
+      success: true,
+      message: `Support ticket ${ticket.ticketId} updated successfully.`,
+      ticket,
+    });
+  } catch (error) {
+    console.error("[Admin Update Ticket Error]:", error?.message || error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to update support ticket.",
+      ...(process.env.NODE_ENV === "development" && { error: error.message }),
+    });
+  }
+});
+
+/**
+ * @route   DELETE /api/admin/support/tickets/:id
+ * @desc    Delete a support ticket (e.g. spam)
+ * @access  Private (Admin Only)
+ */
+router.delete("/support/tickets/:id", async (req, res) => {
+  try {
+    const ticket = await SupportTicket.findByIdAndDelete(req.params.id);
+    if (!ticket) {
+      return res.status(404).json({ success: false, message: "Support ticket not found." });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: `Support ticket ${ticket.ticketId} has been deleted.`,
+    });
+  } catch (error) {
+    console.error("[Admin Delete Ticket Error]:", error?.message || error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to delete support ticket.",
     });
   }
 });

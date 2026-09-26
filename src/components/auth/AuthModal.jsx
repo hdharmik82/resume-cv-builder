@@ -150,9 +150,28 @@ export default function AuthModal({ initialMode = "register", onSuccess }) {
 
         {/* Error Banner */}
         {error && (
-          <div className="mb-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 shrink-0" />
-            <span>{error}</span>
+          <div className="mb-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs flex flex-col gap-1.5">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
+              <span>{error}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                window.dispatchEvent(
+                  new CustomEvent("open-support", {
+                    detail: {
+                      category: "login",
+                      subject: "Account Login Issue",
+                      message: `I encountered an authentication issue: "${error}"`,
+                    },
+                  })
+                );
+              }}
+              className="text-amber-400 hover:text-amber-300 underline font-medium text-[11px] self-start cursor-pointer"
+            >
+              Having trouble logging in? Contact support →
+            </button>
           </div>
         )}
 

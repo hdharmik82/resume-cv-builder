@@ -35,3 +35,16 @@ export const apiLimiter = rateLimit({
     message: "Too many requests. Please try again later.",
   },
 });
+
+// Rate limiter for support tickets to prevent spam abuse
+export const supportLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 15, // Limit each IP to 15 support requests per 15 minutes
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    message: "Too many support tickets submitted from this IP. Please wait a few minutes before submitting another inquiry.",
+  },
+});
+

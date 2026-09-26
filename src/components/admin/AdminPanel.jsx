@@ -34,7 +34,11 @@ import {
   Sliders,
   DollarSign,
   Eye,
-  EyeOff
+  EyeOff,
+  LifeBuoy,
+  MessageSquare,
+  HelpCircle,
+  Send
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 
@@ -97,6 +101,20 @@ export default function AdminPanel({ onBackToBuilder, onBackToLanding }) {
   const [paymentsTotal, setPaymentsTotal] = useState(0);
   const [paymentSearch, setPaymentSearch] = useState("");
   const [paymentStatusFilter, setPaymentStatusFilter] = useState("all");
+
+  // Support Inquiries Data
+  const [supportTickets, setSupportTickets] = useState([]);
+  const [supportLoading, setSupportLoading] = useState(false);
+  const [supportPage, setSupportPage] = useState(1);
+  const [supportTotalPages, setSupportTotalPages] = useState(1);
+  const [supportTotal, setSupportTotal] = useState(0);
+  const [supportOpenCount, setSupportOpenCount] = useState(0);
+  const [supportSearch, setSupportSearch] = useState("");
+  const [supportCategoryFilter, setSupportCategoryFilter] = useState("all");
+  const [supportStatusFilter, setSupportStatusFilter] = useState("all");
+  const [activeTicketModal, setActiveTicketModal] = useState(null);
+  const [updatingTicket, setUpdatingTicket] = useState(false);
+  const [deleteTicketTarget, setDeleteTicketTarget] = useState(null);
 
   // Modals & Forms
   const [showAddUserModal, setShowAddUserModal] = useState(false);
@@ -206,6 +224,40 @@ export default function AdminPanel({ onBackToBuilder, onBackToLanding }) {
     }
   }, [token, paymentsPage, paymentSearch, paymentStatusFilter]);
 
+  // 4. Fetch Support Tickets
+  const fetchSupportTickets = useCallback(async () => {
+    if (!token) return;
+    setSupportLoading(true);
+    try {
+      const params = new URLSearchParams({
+        page: supportPage.toString(),
+        limit: "10",
+        search: supportSearch,
+        category: supportCategoryFilter,
+        status: supportStatusFilter,
+        sortBy: "createdAt",
+        sortOrder: "desc",
+      });
+
+      const res = await fetch(`${API_BASE}/api/admin/support/tickets?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (data.success) {
+        setSupportTickets(data.tickets || []);
+        setSupportTotalPages(data.pagination?.pages || 1);
+        setSupportTotal(data.pagination?.total || 0);
+        setSupportOpenCount(data.counts?.open || 0);
+      } else {
+        showToast(data.message || "Failed to load support tickets.", "error");
+      }
+    } catch (err) {
+      showToast("Network error loading support tickets.", "error");
+    } finally {
+      setSupportLoading(false);
+    }
+  }, [token, supportPage, supportSearch, supportCategoryFilter, supportStatusFilter]);
+
   // Load initial tab data
   useEffect(() => {
     if (activeTab === "dashboard") {
@@ -214,8 +266,90 @@ export default function AdminPanel({ onBackToBuilder, onBackToLanding }) {
       fetchUsers();
     } else if (activeTab === "payments") {
       fetchPayments();
+    } else if (activeTab === "support") {
+      fetchSupportTickets();
     }
-  }, [activeTab, fetchOverview, fetchUsers, fetchPayments]);
+  }, [activeTab, fetchOverview, fetchUsers, fetchPayments, fetchSupportTickets]);
+
+  // Handle Quick Status Change for Support Ticket
+  const handleUpdateTicketStatus = async (ticketId, newStatus) => {
+    try {
+      const res = await fetch(`${API_BASE}/api/admin/support/tickets/${ticketId}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast(`Ticket status marked as ${newStatus.replace("_", " ")}!`, "success");
+        fetchSupportTickets();
+        fetchOverview();
+        if (activeTicketModal && activeTicketModal._id === ticketId) {
+          setActiveTicketModal((prev) => ({ ...prev, status: newStatus }));
+        }
+      } else {
+        showToast(data.message || "Failed to update ticket status.", "error");
+      }
+    } catch (err) {
+      showToast("Network error updating ticket.", "error");
+    }
+  };
+
+  // Handle Save Ticket Admin Notes & Priority
+  const handleSaveTicketDetails = async (ticketId, priority, adminNotes) => {
+    setUpdatingTicket(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/admin/support/tickets/${ticketId}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ priority, adminNotes }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast("Ticket details and resolution notes updated!", "success");
+        fetchSupportTickets();
+        if (activeTicketModal && activeTicketModal._id === ticketId) {
+          setActiveTicketModal(data.ticket);
+        }
+      } else {
+        showToast(data.message || "Failed to update ticket.", "error");
+      }
+    } catch (err) {
+      showToast("Network error saving notes.", "error");
+    } finally {
+      setUpdatingTicket(false);
+    }
+  };
+
+  // Handle Delete Ticket
+  const handleDeleteTicket = async (ticketId) => {
+    try {
+      const res = await fetch(`${API_BASE}/api/admin/support/tickets/${ticketId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast("Support ticket deleted.", "success");
+        setDeleteTicketTarget(null);
+        if (activeTicketModal && activeTicketModal._id === ticketId) {
+          setActiveTicketModal(null);
+        }
+        fetchSupportTickets();
+        fetchOverview();
+      } else {
+        showToast(data.message || "Failed to delete ticket.", "error");
+      }
+    } catch (err) {
+      showToast("Network error deleting ticket.", "error");
+    }
+  };
 
   // Handle Quick Toggle User Paid Status
   const handleTogglePaid = async (targetUser) => {
@@ -365,7 +499,7 @@ export default function AdminPanel({ onBackToBuilder, onBackToLanding }) {
                 <input
                   type="email"
                   required
-                  placeholder="admin@proresume.com"
+                  placeholder="admin@yourdomain.com"
                   value={adminEmail}
                   onChange={(e) => setAdminEmail(e.target.value)}
                   className="w-full px-3.5 py-2.5 bg-zinc-950/80 border border-white/10 rounded-xl text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-amber-400"
@@ -609,6 +743,24 @@ export default function AdminPanel({ onBackToBuilder, onBackToLanding }) {
 
             <button
               type="button"
+              onClick={() => setActiveTab("support")}
+              className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                activeTab === "support"
+                  ? "bg-gradient-to-r from-amber-400 to-yellow-500 text-zinc-950 font-bold shadow-md shadow-amber-500/20"
+                  : "text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.05]"
+              }`}
+            >
+              <LifeBuoy className="w-3.5 h-3.5" />
+              <span>Support Inquiries</span>
+              {(overview?.metrics?.openTickets ?? supportOpenCount) > 0 ? (
+                <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-rose-500 text-white font-mono font-bold animate-pulse">
+                  {overview?.metrics?.openTickets ?? supportOpenCount}
+                </span>
+              ) : null}
+            </button>
+
+            <button
+              type="button"
               onClick={() => setActiveTab("settings")}
               className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
                 activeTab === "settings"
@@ -629,6 +781,7 @@ export default function AdminPanel({ onBackToBuilder, onBackToLanding }) {
                 if (activeTab === "dashboard") fetchOverview();
                 if (activeTab === "users") fetchUsers();
                 if (activeTab === "payments") fetchPayments();
+                if (activeTab === "support") fetchSupportTickets();
                 showToast("Data refreshed", "info");
               }}
               className="p-2 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-zinc-300 border border-white/[0.08] transition-all cursor-pointer text-xs flex items-center gap-1.5"
@@ -653,7 +806,7 @@ export default function AdminPanel({ onBackToBuilder, onBackToLanding }) {
         {activeTab === "dashboard" && (
           <div className="space-y-6">
             {/* Stat Cards Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
               {/* Total Users */}
               <div className="p-5 rounded-2xl bg-zinc-900/50 backdrop-blur-xl border border-white/[0.08] relative overflow-hidden">
                 <div className="flex items-center justify-between">
@@ -727,6 +880,38 @@ export default function AdminPanel({ onBackToBuilder, onBackToLanding }) {
                   <p className="mt-1 text-[11px] text-zinc-400">
                     Users with active ₹99 passes
                   </p>
+                </div>
+              </div>
+
+              {/* Support Inquiries Card */}
+              <div
+                onClick={() => setActiveTab("support")}
+                className="p-5 rounded-2xl bg-zinc-900/50 hover:bg-zinc-900/80 backdrop-blur-xl border border-white/[0.08] hover:border-amber-400/30 relative overflow-hidden cursor-pointer transition-all group"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-zinc-400 group-hover:text-amber-300 transition-colors">
+                    Support Inquiries
+                  </span>
+                  <div className="w-8 h-8 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 flex items-center justify-center">
+                    <LifeBuoy className="w-4 h-4" />
+                  </div>
+                </div>
+                <div className="mt-3">
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-3xl font-black text-white">
+                      {overviewLoading ? "..." : overview?.metrics?.openTickets ?? supportOpenCount}
+                    </span>
+                    <span className="text-xs text-rose-400 font-bold uppercase tracking-wider">
+                      Open
+                    </span>
+                  </div>
+                  <div className="mt-1 flex items-center gap-1.5 text-[11px] text-zinc-400">
+                    <span className="text-amber-300 font-semibold">
+                      {overview?.metrics?.paymentTickets ?? 0} Payment issues
+                    </span>
+                    <span>•</span>
+                    <span className="text-amber-400">View →</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1270,8 +1455,8 @@ export default function AdminPanel({ onBackToBuilder, onBackToLanding }) {
 
               <div className="p-4 rounded-2xl bg-zinc-950/70 border border-white/[0.06] space-y-3">
                 <div className="flex items-center justify-between text-xs">
-                  <span className="text-zinc-400">Default Superadmin Email:</span>
-                  <span className="font-mono text-amber-300 font-bold">admin@proresume.com</span>
+                  <span className="text-zinc-400">Current Administrator:</span>
+                  <span className="font-mono text-amber-300 font-bold">{user?.email || "superadmin@domain.com"}</span>
                 </div>
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-zinc-400">Admin Authorization Policy:</span>
@@ -1298,6 +1483,288 @@ export default function AdminPanel({ onBackToBuilder, onBackToLanding }) {
                 >
                   Seed Sample Data
                 </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 5: SUPPORT TICKETS & CUSTOMER ASSISTANCE */}
+        {activeTab === "support" && (
+          <div className="space-y-4">
+            {/* Search and Filters Bar */}
+            <div className="p-4 rounded-2xl bg-zinc-900/50 backdrop-blur-xl border border-white/[0.08] flex flex-col md:flex-row items-center justify-between gap-3">
+              <div className="relative w-full md:w-80">
+                <Search className="w-4 h-4 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Search by ticket ID, email, or subject..."
+                  value={supportSearch}
+                  onChange={(e) => {
+                    setSupportSearch(e.target.value);
+                    setSupportPage(1);
+                  }}
+                  className="w-full pl-9 pr-3 py-2 bg-zinc-950/80 border border-white/10 rounded-xl text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-amber-400"
+                />
+              </div>
+
+              {/* Category Filter Pills */}
+              <div className="flex items-center gap-1.5 w-full md:w-auto overflow-x-auto">
+                {[
+                  { id: "all", label: "All Categories" },
+                  { id: "payment", label: "Payment (₹99 Pass)" },
+                  { id: "login", label: "Login & Auth" },
+                  { id: "export", label: "Resume Export" },
+                  { id: "builder", label: "Builder Bug" },
+                  { id: "other", label: "Other" },
+                ].map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => {
+                      setSupportCategoryFilter(c.id);
+                      setSupportPage(1);
+                    }}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+                      supportCategoryFilter === c.id
+                        ? "bg-amber-500/10 text-amber-300 border border-amber-500/30 font-bold"
+                        : "text-zinc-400 hover:text-white hover:bg-white/[0.04]"
+                    }`}
+                  >
+                    {c.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Status Filter */}
+              <div className="flex items-center gap-1.5 w-full md:w-auto">
+                <select
+                  value={supportStatusFilter}
+                  onChange={(e) => {
+                    setSupportStatusFilter(e.target.value);
+                    setSupportPage(1);
+                  }}
+                  className="px-3 py-1.5 bg-zinc-950/80 border border-white/10 rounded-xl text-xs text-zinc-300 focus:outline-none focus:border-amber-400 cursor-pointer"
+                >
+                  <option value="all">All Statuses</option>
+                  <option value="open">Open Inquiries</option>
+                  <option value="in_progress">In Progress</option>
+                  <option value="resolved">Resolved</option>
+                  <option value="closed">Closed</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Support Tickets Data Table */}
+            <div className="rounded-3xl bg-zinc-900/50 backdrop-blur-xl border border-white/[0.08] overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-zinc-950/60 text-zinc-400 border-b border-white/[0.06] font-semibold uppercase text-[10px] tracking-wider">
+                    <tr>
+                      <th className="py-3.5 px-4 sm:px-6">Ticket Ref</th>
+                      <th className="py-3.5 px-4">Candidate</th>
+                      <th className="py-3.5 px-4">Category</th>
+                      <th className="py-3.5 px-4">Subject & Inquiry</th>
+                      <th className="py-3.5 px-4 text-center">Status</th>
+                      <th className="py-3.5 px-4">Received</th>
+                      <th className="py-3.5 px-4 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/[0.05]">
+                    {supportLoading ? (
+                      <tr>
+                        <td colSpan={7} className="py-12 text-center text-zinc-400">
+                          <div className="flex items-center justify-center gap-2">
+                            <RefreshCw className="w-4 h-4 animate-spin text-amber-400" />
+                            <span>Loading support tickets...</span>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : supportTickets.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="py-12 text-center text-zinc-500">
+                          No support tickets match the current filter criteria.
+                        </td>
+                      </tr>
+                    ) : (
+                      supportTickets.map((t) => {
+                        const isPayment = t.category === "payment";
+                        const isLogin = t.category === "login";
+                        const isExport = t.category === "export";
+                        const isBuilder = t.category === "builder";
+
+                        return (
+                          <tr key={t._id} className="hover:bg-white/[0.02] transition-colors">
+                            {/* Ticket Ref + Priority */}
+                            <td className="py-3.5 px-4 sm:px-6">
+                              <div className="space-y-1">
+                                <span className="font-mono text-xs font-bold text-amber-300 block">
+                                  {t.ticketId}
+                                </span>
+                                <span
+                                  className={`inline-block px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider ${
+                                    t.priority === "urgent"
+                                      ? "bg-rose-500/20 text-rose-300 border border-rose-500/30"
+                                      : t.priority === "high"
+                                      ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
+                                      : "bg-zinc-800 text-zinc-400"
+                                  }`}
+                                >
+                                  {t.priority}
+                                </span>
+                              </div>
+                            </td>
+
+                            {/* Candidate info */}
+                            <td className="py-3.5 px-4">
+                              <div className="space-y-0.5">
+                                <p className="font-semibold text-white">{t.name || "Candidate"}</p>
+                                <p className="text-[11px] text-zinc-400 font-mono flex items-center gap-1">
+                                  {t.email}
+                                  <button
+                                    type="button"
+                                    onClick={() => copyToClipboard(t.email, t._id)}
+                                    className="p-0.5 text-zinc-500 hover:text-zinc-300 cursor-pointer"
+                                    title="Copy Email"
+                                  >
+                                    {copiedId === t._id ? (
+                                      <Check className="w-3 h-3 text-emerald-400" />
+                                    ) : (
+                                      <Copy className="w-3 h-3" />
+                                    )}
+                                  </button>
+                                </p>
+                                {t.userId && (
+                                  <span className="inline-block px-1.5 py-0.2 rounded text-[9px] font-semibold bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">
+                                    {t.userId.isPaid ? "₹99 Pass Holder" : "Registered User"}
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+
+                            {/* Category Badge */}
+                            <td className="py-3.5 px-4">
+                              <span
+                                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border ${
+                                  isPayment
+                                    ? "bg-amber-500/10 text-amber-300 border-amber-500/20"
+                                    : isLogin
+                                    ? "bg-blue-500/10 text-blue-300 border-blue-500/20"
+                                    : isExport
+                                    ? "bg-purple-500/10 text-purple-300 border-purple-500/20"
+                                    : isBuilder
+                                    ? "bg-emerald-500/10 text-emerald-300 border-emerald-500/20"
+                                    : "bg-zinc-800/80 text-zinc-300 border-white/10"
+                                }`}
+                              >
+                                {isPayment && <CreditCard className="w-3 h-3 text-amber-400" />}
+                                {isLogin && <LogIn className="w-3 h-3 text-blue-400" />}
+                                {isExport && <FileDown className="w-3 h-3 text-purple-400" />}
+                                {isBuilder && <Wrench className="w-3 h-3 text-emerald-400" />}
+                                {!isPayment && !isLogin && !isExport && !isBuilder && (
+                                  <HelpCircle className="w-3 h-3 text-zinc-400" />
+                                )}
+                                <span className="capitalize">{t.category}</span>
+                              </span>
+                            </td>
+
+                            {/* Subject & Message */}
+                            <td className="py-3.5 px-4 max-w-xs">
+                              <div className="space-y-0.5">
+                                <p className="font-semibold text-white truncate">{t.subject}</p>
+                                <p className="text-[11px] text-zinc-400 line-clamp-1">{t.message}</p>
+                                {t.adminNotes && (
+                                  <p className="text-[10px] text-amber-400/90 italic truncate">
+                                    Note: {t.adminNotes}
+                                  </p>
+                                )}
+                              </div>
+                            </td>
+
+                            {/* Status */}
+                            <td className="py-3.5 px-4 text-center">
+                              <select
+                                value={t.status}
+                                onChange={(e) => handleUpdateTicketStatus(t._id, e.target.value)}
+                                className={`px-2.5 py-1 rounded-full text-[10px] font-bold border uppercase tracking-wider cursor-pointer outline-none transition-all ${
+                                  t.status === "open"
+                                    ? "bg-amber-500/10 text-amber-300 border-amber-500/30"
+                                    : t.status === "in_progress"
+                                    ? "bg-blue-500/10 text-blue-300 border-blue-500/30"
+                                    : t.status === "resolved"
+                                    ? "bg-emerald-500/10 text-emerald-300 border-emerald-500/30"
+                                    : "bg-zinc-800 text-zinc-400 border-white/10"
+                                }`}
+                              >
+                                <option value="open" className="bg-zinc-900 text-white">Open</option>
+                                <option value="in_progress" className="bg-zinc-900 text-white">In Progress</option>
+                                <option value="resolved" className="bg-zinc-900 text-white">Resolved</option>
+                                <option value="closed" className="bg-zinc-900 text-white">Closed</option>
+                              </select>
+                            </td>
+
+                            {/* Received */}
+                            <td className="py-3.5 px-4 text-[11px] text-zinc-400 font-mono whitespace-nowrap">
+                              {new Date(t.createdAt).toLocaleDateString()}
+                              <span className="block text-[9px] text-zinc-500">
+                                {new Date(t.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                              </span>
+                            </td>
+
+                            {/* Actions */}
+                            <td className="py-3.5 px-4 text-right">
+                              <div className="flex items-center justify-end gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => setActiveTicketModal(t)}
+                                  className="px-2.5 py-1 rounded-lg bg-white/[0.05] hover:bg-white/[0.1] text-zinc-200 hover:text-white border border-white/[0.08] text-xs font-semibold transition-all cursor-pointer"
+                                  title="View Full Ticket & Internal Notes"
+                                >
+                                  Details
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setDeleteTicketTarget(t)}
+                                  className="p-1 rounded-lg hover:bg-rose-950/40 text-zinc-400 hover:text-rose-400 transition-colors cursor-pointer"
+                                  title="Delete Ticket"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Pagination */}
+              <div className="p-4 border-t border-white/[0.06] flex items-center justify-between text-xs text-zinc-400">
+                <span>
+                  Showing {supportTickets.length} of {supportTotal} inquiries
+                </span>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setSupportPage(Math.max(1, supportPage - 1))}
+                    disabled={supportPage <= 1}
+                    className="p-1.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] text-zinc-300 disabled:opacity-30 cursor-pointer"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                  <span className="font-mono text-zinc-200 px-2">
+                    Page {supportPage} of {supportTotalPages}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setSupportPage(Math.min(supportTotalPages, supportPage + 1))}
+                    disabled={supportPage >= supportTotalPages}
+                    className="p-1.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] text-zinc-300 disabled:opacity-30 cursor-pointer"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -1390,6 +1857,264 @@ export default function AdminPanel({ onBackToBuilder, onBackToLanding }) {
           token={token}
         />
       )}
+      {/* MODAL 6: TICKET DETAILS & NOTES */}
+      {activeTicketModal && (
+        <TicketDetailModal
+          ticket={activeTicketModal}
+          onClose={() => setActiveTicketModal(null)}
+          onSaveNotes={handleSaveTicketDetails}
+          onUpdateStatus={handleUpdateTicketStatus}
+          onDelete={() => {
+            setDeleteTicketTarget(activeTicketModal);
+          }}
+          saving={updatingTicket}
+        />
+      )}
+
+      {/* MODAL 7: DELETE TICKET CONFIRMATION */}
+      {deleteTicketTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="w-full max-w-sm bg-zinc-950 border border-rose-500/30 rounded-3xl p-6 shadow-2xl text-center">
+            <div className="w-12 h-12 rounded-full bg-rose-500/10 border border-rose-500/20 text-rose-400 mx-auto flex items-center justify-center mb-4">
+              <Trash2 className="w-6 h-6" />
+            </div>
+            <h3 className="text-base font-bold text-white">Delete Support Ticket?</h3>
+            <p className="mt-1 text-xs text-zinc-400">
+              Are you sure you want to permanently delete ticket{" "}
+              <strong className="text-amber-300 font-mono">{deleteTicketTarget.ticketId}</strong> from candidate{" "}
+              <strong className="text-zinc-200">{deleteTicketTarget.email}</strong>?
+            </p>
+            <div className="mt-6 flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setDeleteTicketTarget(null)}
+                className="flex-1 py-2 px-3 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] text-zinc-300 text-xs font-semibold cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDeleteTicket(deleteTicketTarget._id)}
+                className="flex-1 py-2 px-3 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold cursor-pointer"
+              >
+                Confirm Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Sub-Modal: Ticket Details & Resolution Notes
+function TicketDetailModal({ ticket, onClose, onSaveNotes, onUpdateStatus, onDelete, saving }) {
+  const [priority, setPriority] = useState(ticket.priority || "medium");
+  const [status, setStatus] = useState(ticket.status || "open");
+  const [adminNotes, setAdminNotes] = useState(ticket.adminNotes || "");
+  const [copied, setCopied] = useState(false);
+
+  const handleCopyEmail = () => {
+    navigator.clipboard.writeText(ticket.email);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const isPayment = ticket.category === "payment";
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
+      <div className="relative w-full max-w-xl max-h-[90vh] bg-zinc-950 border border-white/[0.12] rounded-3xl shadow-2xl flex flex-col overflow-hidden text-zinc-100">
+        {/* Header */}
+        <div className="p-5 border-b border-white/[0.08] flex items-center justify-between bg-zinc-900/50">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center">
+              <LifeBuoy className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-mono text-sm font-bold text-amber-300">{ticket.ticketId}</span>
+                <span
+                  className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                    isPayment
+                      ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
+                      : "bg-blue-500/20 text-blue-300 border border-blue-500/30"
+                  }`}
+                >
+                  {ticket.category}
+                </span>
+              </div>
+              <p className="text-[11px] text-zinc-400">
+                Received on {new Date(ticket.createdAt).toLocaleString()}
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-1.5 rounded-xl hover:bg-white/[0.08] text-zinc-400 hover:text-white transition-all cursor-pointer"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Scrollable Body */}
+        <div className="p-5 overflow-y-auto space-y-4 text-xs">
+          {/* Candidate Card */}
+          <div className="p-3.5 rounded-2xl bg-zinc-900/70 border border-white/[0.06] flex items-center justify-between flex-wrap gap-2">
+            <div>
+              <p className="font-bold text-white text-sm">{ticket.name || "Candidate"}</p>
+              <div className="flex items-center gap-2 text-zinc-400 text-xs mt-0.5">
+                <a
+                  href={`mailto:${ticket.email}?subject=RE: Support Inquiry ${ticket.ticketId}`}
+                  className="hover:text-amber-300 underline font-mono"
+                >
+                  {ticket.email}
+                </a>
+                <button
+                  type="button"
+                  onClick={handleCopyEmail}
+                  className="text-zinc-500 hover:text-zinc-300 cursor-pointer"
+                  title="Copy email"
+                >
+                  {copied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                </button>
+              </div>
+            </div>
+
+            <div className="text-right">
+              {ticket.userId ? (
+                <span className="inline-block px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">
+                  {ticket.userId.isPaid ? "₹99 Pass Holder" : "Registered User"}
+                </span>
+              ) : (
+                <span className="inline-block px-2.5 py-1 rounded-full text-[10px] font-semibold bg-white/[0.04] text-zinc-400 border border-white/10">
+                  Guest Visitor
+                </span>
+              )}
+              {ticket.userId?.phone && (
+                <p className="text-[11px] text-zinc-400 font-mono mt-0.5">{ticket.userId.phone}</p>
+              )}
+            </div>
+          </div>
+
+          {/* Inquiry Subject & Full Message */}
+          <div className="space-y-1.5">
+            <label className="block text-[11px] font-bold text-zinc-400 uppercase tracking-wider">
+              Issue Subject
+            </label>
+            <p className="p-2.5 rounded-xl bg-zinc-900/50 border border-white/[0.06] text-white font-semibold">
+              {ticket.subject}
+            </p>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="block text-[11px] font-bold text-zinc-400 uppercase tracking-wider">
+              Full Inquiry Message
+            </label>
+            <div className="p-3.5 rounded-xl bg-zinc-900/60 border border-white/[0.08] text-zinc-200 whitespace-pre-wrap leading-relaxed font-sans">
+              {ticket.message}
+            </div>
+          </div>
+
+          {/* Context / Metadata */}
+          {ticket.pageUrl && (
+            <div className="p-2.5 rounded-xl bg-zinc-950/60 border border-white/[0.04] text-[11px] text-zinc-400 flex items-center justify-between">
+              <span>Source URL:</span>
+              <span className="font-mono text-zinc-300 truncate max-w-xs">{ticket.pageUrl}</span>
+            </div>
+          )}
+
+          {/* Status & Priority Controls */}
+          <div className="grid grid-cols-2 gap-3 pt-1">
+            <div>
+              <label className="block text-[11px] font-semibold text-zinc-300 mb-1">
+                Ticket Status
+              </label>
+              <select
+                value={status}
+                onChange={(e) => {
+                  setStatus(e.target.value);
+                  onUpdateStatus(ticket._id, e.target.value);
+                }}
+                className="w-full px-3 py-2 rounded-xl bg-zinc-900 border border-white/10 text-white text-xs outline-none focus:border-amber-400 cursor-pointer"
+              >
+                <option value="open">Open</option>
+                <option value="in_progress">In Progress</option>
+                <option value="resolved">Resolved</option>
+                <option value="closed">Closed</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-semibold text-zinc-300 mb-1">
+                Priority Level
+              </label>
+              <select
+                value={priority}
+                onChange={(e) => setPriority(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl bg-zinc-900 border border-white/10 text-white text-xs outline-none focus:border-amber-400 cursor-pointer"
+              >
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+                <option value="urgent">Urgent</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Internal Admin Resolution Notes */}
+          <div className="space-y-1.5">
+            <label className="block text-[11px] font-semibold text-zinc-300">
+              Internal Admin Notes & Follow-up History
+            </label>
+            <textarea
+              rows={3}
+              value={adminNotes}
+              onChange={(e) => setAdminNotes(e.target.value)}
+              placeholder="Record actions taken, candidate email response summary..."
+              className="w-full p-3 rounded-xl bg-zinc-900 border border-white/10 text-white text-xs outline-none focus:border-amber-400 resize-none"
+            />
+          </div>
+
+          {ticket.resolvedAt && (
+            <p className="text-[11px] text-emerald-400 font-medium">
+              ✓ Marked resolved by {ticket.resolvedBy || "Admin"} on{" "}
+              {new Date(ticket.resolvedAt).toLocaleString()}
+            </p>
+          )}
+        </div>
+
+        {/* Footer Actions */}
+        <div className="p-4 border-t border-white/[0.08] flex items-center justify-between bg-zinc-900/50">
+          <button
+            type="button"
+            onClick={() => onDelete(ticket._id)}
+            className="p-2 rounded-xl hover:bg-rose-950/40 text-zinc-400 hover:text-rose-400 transition-colors text-xs font-semibold cursor-pointer flex items-center gap-1.5"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            <span>Delete</span>
+          </button>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-3.5 py-2 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] text-zinc-300 text-xs font-semibold cursor-pointer"
+            >
+              Close
+            </button>
+            <button
+              type="button"
+              disabled={saving}
+              onClick={() => onSaveNotes(ticket._id, priority, adminNotes)}
+              className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-zinc-950 font-bold text-xs shadow-lg shadow-amber-500/20 cursor-pointer disabled:opacity-50"
+            >
+              {saving ? "Saving..." : "Save Notes & Priority"}
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

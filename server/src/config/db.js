@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import { seedInitialDataIfNeeded } from "../utils/seedData.js";
+import { sanitizeUriForLogging } from "../utils/sanitize.js";
 
 let mongoMemoryServerInstance = null;
 let dbStatus = {
@@ -39,7 +40,8 @@ export async function connectDB() {
     await seedInitialDataIfNeeded();
     return conn;
   } catch (error) {
-    console.warn(`[MongoDB] Primary connection to ${uri} failed: ${error.message}`);
+    const maskedUri = sanitizeUriForLogging(uri);
+    console.warn(`[MongoDB] Primary connection to ${maskedUri} failed: ${error.message}`);
     dbStatus.error = error.message;
 
     // 2. Fallback to in-memory MongoDB for seamless development and testing

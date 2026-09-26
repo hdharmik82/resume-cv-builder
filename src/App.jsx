@@ -48,6 +48,8 @@ import ExecutiveTemplate from "./components/templates/ExecutiveTemplate";
 import { useAuth } from "./context/AuthContext";
 import AuthModal from "./components/auth/AuthModal";
 import PaymentModal from "./components/payment/PaymentModal";
+import SupportWidget from "./components/support/SupportWidget";
+
 
 const TABS = [
   { id: "personal", label: "Personal", icon: User },
@@ -324,10 +326,13 @@ export default function App() {
   // If on Landing Page, render LandingPage view
   if (view === "landing") {
     return (
-      <LandingPage
-        onStartBuilding={navigateToBuilder}
-        onOpenAdmin={navigateToAdmin}
-      />
+      <>
+        <LandingPage
+          onStartBuilding={navigateToBuilder}
+          onOpenAdmin={navigateToAdmin}
+        />
+        <SupportWidget />
+      </>
     );
   }
 
@@ -778,6 +783,9 @@ export default function App() {
 
       {/* Razorpay ₹99 Payment Modal */}
       <PaymentModal onSuccess={handlePrint} />
+
+      {/* Floating Support Widget (Bottom-Right) */}
+      <SupportWidget />
     </div>
   );
 }

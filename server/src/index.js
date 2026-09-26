@@ -6,6 +6,7 @@ import { connectDB } from "./config/db.js";
 import authRoutes from "./routes/auth.js";
 import paymentRoutes from "./routes/payment.js";
 import adminRoutes from "./routes/admin.js";
+import supportRoutes from "./routes/support.js";
 import { apiLimiter } from "./middleware/rateLimiter.js";
 
 dotenv.config();
@@ -80,6 +81,7 @@ app.get("/api/health", (req, res) => {
 app.use("/api/auth", authRoutes);
 app.use("/api/payment", paymentRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api/support", supportRoutes);
 
 // 404 Handler for undefined API routes
 app.use("/api/*", (req, res) => {
@@ -89,17 +91,20 @@ app.use("/api/*", (req, res) => {
   });
 });
 
-// Global Centralized Error Handling Middleware (Sanitized)
+// Global Centralized Error Handling Middleware (Sanitized against leakage)
 app.use((err, req, res, next) => {
-  console.error("[Unhandled Server Error]:", err);
+  console.error("[Unhandled Server Error]:", err?.message || err);
   const isDev = process.env.NODE_ENV === "development";
 
   res.status(err.status || 500).json({
     success: false,
-    message: err.message || "An internal server error occurred.",
+    message: isDev
+      ? err.message || "An internal server error occurred."
+      : "An unexpected error occurred. Please try again later.",
     ...(isDev && { stack: err.stack }),
   });
 });
+
 
 // Connect to MongoDB & Start Server
 async function startServer() {

@@ -107,11 +107,11 @@ router.post("/create-order", authenticateToken, paymentLimiter, async (req, res)
       },
     });
   } catch (error) {
-    console.error("[Create Order Error]:", error);
+    console.error("[Create Order Error]:", error?.message || error);
     return res.status(500).json({
       success: false,
       message: "Unable to initiate payment. Please try again.",
-      error: error.message,
+      ...(process.env.NODE_ENV === "development" && { error: error.message }),
     });
   }
 });
