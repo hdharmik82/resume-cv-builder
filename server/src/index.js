@@ -5,6 +5,7 @@ import dotenv from "dotenv";
 import { connectDB } from "./config/db.js";
 import authRoutes from "./routes/auth.js";
 import paymentRoutes from "./routes/payment.js";
+import adminRoutes from "./routes/admin.js";
 import { apiLimiter } from "./middleware/rateLimiter.js";
 
 dotenv.config();
@@ -78,6 +79,7 @@ app.get("/api/health", (req, res) => {
 // API Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/payment", paymentRoutes);
+app.use("/api/admin", adminRoutes);
 
 // 404 Handler for undefined API routes
 app.use("/api/*", (req, res) => {

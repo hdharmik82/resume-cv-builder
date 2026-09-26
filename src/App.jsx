@@ -23,11 +23,13 @@ import {
   LogIn,
   LogOut,
   CreditCard,
-  Sparkles
+  Sparkles,
+  Shield
 } from "lucide-react";
 
 import { initialResumeData, presets, colorPalettes, fontFamilies } from "./data/initialData";
 import LandingPage from "./components/LandingPage";
+import AdminPanel from "./components/admin/AdminPanel";
 import PersonalEditor from "./components/editor/PersonalEditor";
 import SummaryEditor from "./components/editor/SummaryEditor";
 import ExperienceEditor from "./components/editor/ExperienceEditor";
@@ -60,9 +62,11 @@ const TABS = [
 ];
 
 export default function App() {
-  // Page View state: "landing" | "builder"
+  // Page View state: "landing" | "builder" | "admin"
   const [view, setView] = useState(() => {
-    return window.location.hash === "#builder" ? "builder" : "landing";
+    if (window.location.hash === "#builder") return "builder";
+    if (window.location.hash === "#admin") return "admin";
+    return "landing";
   });
 
   // Load saved state or default
@@ -123,6 +127,8 @@ export default function App() {
     const handleHashChange = () => {
       if (window.location.hash === "#builder") {
         setView("builder");
+      } else if (window.location.hash === "#admin") {
+        setView("admin");
       } else {
         setView("landing");
       }
@@ -142,6 +148,11 @@ export default function App() {
   const navigateToLanding = () => {
     window.location.hash = "";
     setView("landing");
+  };
+
+  const navigateToAdmin = () => {
+    window.location.hash = "admin";
+    setView("admin");
   };
 
   // Auto-save to localStorage with QuotaExceededError warning banner (BUG-011)
@@ -300,9 +311,24 @@ export default function App() {
     }
   };
 
+  // If in Admin Panel, render AdminPanel view
+  if (view === "admin") {
+    return (
+      <AdminPanel
+        onBackToBuilder={() => navigateToBuilder()}
+        onBackToLanding={() => navigateToLanding()}
+      />
+    );
+  }
+
   // If on Landing Page, render LandingPage view
   if (view === "landing") {
-    return <LandingPage onStartBuilding={navigateToBuilder} />;
+    return (
+      <LandingPage
+        onStartBuilding={navigateToBuilder}
+        onOpenAdmin={navigateToAdmin}
+      />
+    );
   }
 
   // Otherwise render interactive Resume Builder workspace
@@ -427,6 +453,21 @@ export default function App() {
             </button>
           </div>
 
+          {/* Admin Portal Quick Link Button - Always visible for quick access */}
+          <button
+            type="button"
+            onClick={navigateToAdmin}
+            className={`text-xs px-2.5 py-1.5 rounded-xl flex items-center gap-1.5 transition-all cursor-pointer font-bold ${
+              user?.role === "admin"
+                ? "bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 shadow-sm"
+                : "bg-white/[0.04] hover:bg-white/[0.08] text-zinc-400 hover:text-zinc-200 border border-white/[0.08]"
+            }`}
+            title="Open Admin Control Center"
+          >
+            <Shield className={`w-3.5 h-3.5 ${user?.role === "admin" ? "text-amber-400" : "text-zinc-400"}`} />
+            <span className="hidden sm:inline">{user?.role === "admin" ? "Admin Panel" : "Admin"}</span>
+          </button>
+
           {/* User Profile / Auth Button */}
           {user ? (
             <div className="relative">
@@ -474,6 +515,20 @@ export default function App() {
                       )}
                     </div>
                   </div>
+
+                  {user.role === "admin" && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowUserMenu(false);
+                        navigateToAdmin();
+                      }}
+                      className="w-full text-left px-3 py-2 rounded-lg hover:bg-amber-500/10 text-amber-300 font-semibold flex items-center gap-2 cursor-pointer mb-1"
+                    >
+                      <Shield className="w-3.5 h-3.5" />
+                      <span>Admin Control Center</span>
+                    </button>
+                  )}
 
                   {!isPaid && (
                     <button

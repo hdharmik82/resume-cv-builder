@@ -49,11 +49,11 @@ router.post("/register", authLimiter, async (req, res) => {
       });
     }
 
-    const phoneRegex = /^[0-9+\-\s()]{7,15}$/;
+    const phoneRegex = /^[0-9+\-\s()]{7,20}$/;
     if (!phone || !phoneRegex.test(phone)) {
       return res.status(400).json({
         success: false,
-        message: "Please enter a valid mobile number (7 to 15 digits).",
+        message: "Please enter a valid mobile number (7 to 20 characters).",
       });
     }
 
