@@ -5,6 +5,7 @@
   "main": "src/index.js",
   "type": "module",
   "scripts": {
+    "build": "echo 'Build successful for server'",
     "start": "node src/index.js",
     "dev": "node --watch src/index.js"
   },

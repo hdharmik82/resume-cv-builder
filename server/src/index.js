@@ -103,9 +103,9 @@ app.use((err, req, res, next) => {
 async function startServer() {
   await connectDB();
 
-  app.listen(PORT, () => {
+  app.listen(PORT, "0.0.0.0", () => {
     console.log(
-      `[ProResume Server] Running on http://localhost:${PORT} in ${
+      `[ProResume Server] Running on http://0.0.0.0:${PORT} in ${
         process.env.NODE_ENV || "development"
       } mode`
     );
