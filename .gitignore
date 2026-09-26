@@ -45,3 +45,7 @@ lerna-debug.log*
 *.secret
 secrets/
 credentials/
+
+# Internal Process & Solution Design Documents (Local only)
+documents/
+documents
